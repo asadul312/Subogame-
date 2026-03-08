@@ -221,8 +221,8 @@ if text or files:
                 response=res.content[0].text
 
             # GROQ
-                elif
 
+from groq import Groq
 
 client = Groq(
     api_key=os.environ.get("GROQ_API_KEY"),
@@ -239,9 +239,6 @@ chat_completion = client.chat.completions.create(
 )
 
 print(chat_completion.choices[0].message.content)
-
-                response=res.choices[0].message.content
-
             box.markdown(response)
 
         except Exception as e:
