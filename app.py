@@ -221,14 +221,24 @@ if text or files:
                 response=res.content[0].text
 
             # GROQ
-            elif MODEL=="Groq Vision":
+                elif
 
-                client=Groq(api_key=get_api("GROQ"))
 
-                res=client.chat.completions.create(
-                model="llama-3.2-11b-vision-preview",
-                messages=[{"role":"user","content":text}]
-                )
+client = Groq(
+    api_key=os.environ.get("GROQ_API_KEY"),
+)
+
+chat_completion = client.chat.completions.create(
+    messages=[
+        {
+            "role": "user",
+            "content": "Explain the importance of fast language models",
+        }
+    ],
+    model="llama-3.3-70b-versatile",
+)
+
+print(chat_completion.choices[0].message.content)
 
                 response=res.choices[0].message.content
 
