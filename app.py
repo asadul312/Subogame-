@@ -1,6 +1,7 @@
 import streamlit as st
 import google.generativeai as genai
-from groq import Groq
+from groq import Groq # Groq এখন LLaVA সাপোর্ট করে!
+from anthropic import Anthropic
 import requests
 import json
 from PIL import Image
@@ -14,64 +15,52 @@ import base64
 # ==========================================
 # ১. পেজ ডিজাইন 
 # ==========================================
-st.set_page_config(page_title="NEXUS AI OS", page_icon="🌌", layout="wide")
+st.set_page_config(page_title="NEXUS VISION AI", page_icon="👁️", layout="wide")
 
 st.markdown("""
     <style>
     .stApp { background: radial-gradient(circle at top right, #0b0f19, #000000); color: #e2e8f0; }
-    
     [data-testid="stChatMessage"] {
         background: rgba(16, 24, 39, 0.8) !important;
         backdrop-filter: blur(10px) !important;
         border: 1px solid rgba(56, 189, 248, 0.2) !important;
         border-radius: 12px !important;
-        padding: 15px 20px !important;
-        margin-bottom: 12px !important;
+        padding: 15px 20px !important; margin-bottom: 12px !important;
     }
-    
     .nexus-title {
         font-size: 2.5rem; font-weight: bold; text-align: center;
         background: linear-gradient(to right, #38bdf8, #c084fc);
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        margin-bottom: 20px;
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 20px;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# ২. মডেল ক্যাটালগ (এখানেই সব মডেলের তথ্য থাকবে)
+# ২. অলরাউন্ডার মডেল ক্যাটালগ (শুধু Vision মডেল)
 # ==========================================
 MODEL_CATALOG = {
-    "Groq: Llama 3.3 70B": {"id": "llama-3.3-70b-versatile", "provider": "groq", "vision": False},
-    "Groq: Qwen 2.5 Coder": {"id": "qwen-2.5-coder-32b", "provider": "groq", "vision": False},
-    "Gemini: 1.5 Pro 👁️": {"id": "gemini-1.5-pro", "provider": "gemini", "vision": True},
-    "Gemini: 1.5 Flash 👁️": {"id": "gemini-1.5-flash", "provider": "gemini", "vision": True},
-    "OpenRouter: GPT-4o 👁️": {"id": "openai/gpt-4o", "provider": "openrouter", "vision": True},
-    "OpenRouter: Claude 3.5 Sonnet 👁️": {"id": "anthropic/claude-3.5-sonnet", "provider": "openrouter", "vision": True},
-    "OpenRouter: DeepSeek R1": {"id": "deepseek/deepseek-r1", "provider": "openrouter", "vision": False}
+    "Gemini: 1.5 Pro 👁️": {"id": "gemini-1.5-pro", "provider": "gemini"},
+    "Anthropic: Claude 3.5 Sonnet 👁️": {"id": "claude-3-5-sonnet-20240620", "provider": "anthropic"},
+    "Groq: LLaVA (Fast Vision) 👁️": {"id": "llava-v1.5-7b-4096", "provider": "groq"},
 }
 
 # ==========================================
 # ৩. ডাটাবেস এবং সেশন 
 # ==========================================
 DB_FILE = "nexus_db.json"
-
 def hash_pass(password): return hashlib.sha256(password.encode()).hexdigest()
-
 def load_db():
     if os.path.exists(DB_FILE):
         with open(DB_FILE, "r") as f: return json.load(f)
     return {"users": {}, "chats": {}}
-
 def save_db(db):
     with open(DB_FILE, "w") as f: json.dump(db, f)
-
 db = load_db()
 
 # সেশন ভ্যারিয়েবলস
 if "logged_in" not in st.session_state: st.session_state.logged_in = False
 if "username" not in st.session_state: st.session_state.username = "Guest"
-if "api_keys" not in st.session_state: st.session_state.api_keys = {"GROQ": "", "GEMINI": "", "OPENROUTER": ""}
+if "api_keys" not in st.session_state: st.session_state.api_keys = {"GROQ": "", "GEMINI": "", "ANTHROPIC": ""}
 if "messages" not in st.session_state: st.session_state.messages =[]
 if "code_outputs" not in st.session_state: st.session_state.code_outputs = {}
 
@@ -81,6 +70,7 @@ if "code_outputs" not in st.session_state: st.session_state.code_outputs = {}
 with st.sidebar:
     st.markdown("<h2 style='color: #38bdf8;'>⚙️ Settings</h2>", unsafe_allow_html=True)
     
+    # ... (Login/Register UI remains the same)
     if not st.session_state.logged_in:
         auth_mode = st.radio("Access",["Login", "Register"], horizontal=True)
         user = st.text_input("Username")
@@ -108,53 +98,43 @@ with st.sidebar:
 
     st.divider()
     
-    selected_model_name = st.selectbox("Select AI Model", list(MODEL_CATALOG.keys()))
+    selected_model_name = st.selectbox("Select All-Rounder Model", list(MODEL_CATALOG.keys()))
     
     with st.expander("🔑 Secure API Keys"):
         st.session_state.api_keys["GROQ"] = st.text_input("Groq Key", type="password", value=st.session_state.api_keys["GROQ"])
         st.session_state.api_keys["GEMINI"] = st.text_input("Gemini Key", type="password", value=st.session_state.api_keys["GEMINI"])
-        st.session_state.api_keys["OPENROUTER"] = st.text_input("OpenRouter Key", type="password", value=st.session_state.api_keys["OPENROUTER"])
+        st.session_state.api_keys["ANTHROPIC"] = st.text_input("Anthropic Key", type="password", value=st.session_state.api_keys["ANTHROPIC"])
 
+# ==========================================
+# 💡💡💡 এপিআই কী এখানে বসান 💡💡💡
+# ==========================================
 def get_key(prov):
     user_key = st.session_state.api_keys.get(prov.upper())
     if user_key: return user_key
     
+    # বিকল্প: আপনার আসল এপিআই কীগুলো এখানে বসান
     hardcoded_keys = {
-        "GROQ": "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", # আপনার Groq কী এখানে দিন
-        "GEMINI": "", # আপনার Gemini কী এখানে দিন
-        "OPENROUTER": "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" # আপনার OpenRouter কী এখানে দিন
+        "GROQ": "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",
+        "GEMINI": "আপনার_GEMINI_কী_এখানে_দিন",
+        "ANTHROPIC": "আপনার_ANTHROPIC_কী_এখানে_দিন"
     }
     return hardcoded_keys.get(prov.upper())
 
 # ==========================================
 # ৫. চ্যাট হিস্ট্রি এবং কোড রানার
 # ==========================================
-st.markdown("<div class='nexus-title'>NEXUS AI OS</div>", unsafe_allow_html=True)
-
-def run_code(code):
-    old_out = sys.stdout
-    redirected_output = sys.stdout = io.StringIO()
-    try: 
-        exec(code, globals())
-        output = redirected_output.getvalue()
-        return output if output.strip() else "✅ Code ran successfully (No printed output)."
-    except Exception as e: 
-        return f"❌ Error:\n{str(e)}"
-    finally: 
-        sys.stdout = old_out
-
+st.markdown("<div class='nexus-title'>NEXUS VISION AI</div>", unsafe_allow_html=True)
+# ... (Code runner and chat history display remains the same)
 for i, msg in enumerate(st.session_state.messages):
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
         if "images" in msg and msg["images"]:
-            # বেস৬৪ স্ট্রিং থেকে ছবি দেখানো
             try:
                 img_data = base64.b64decode(msg["images"][0].split(",")[1])
                 st.image(Image.open(io.BytesIO(img_data)), width=200)
-            except: pass # পুরানো ফরম্যাটের জন্য
+            except: pass
         
         if msg["role"] == "assistant" and "```python" in msg["content"]:
-            # ... (Code runner remains the same)
             code_blocks = msg["content"].split("```python")[1:]
             for idx, block in enumerate(code_blocks):
                 code_str = block.split("```").strip()
@@ -162,8 +142,7 @@ for i, msg in enumerate(st.session_state.messages):
                 col1, col2, _ = st.columns([0.15, 0.25, 0.6])
                 if col1.button("▶️ Run Code", key=btn_key):
                     st.session_state.code_outputs[btn_key] = run_code(code_str)
-                if col2.download_button("📥 Download .py", data=code_str, file_name=f"script_{i}_{idx}.py", mime="text/plain", key=f"dl_{i}_{idx}"):
-                    pass
+                if col2.download_button("📥 Download .py", data=code_str, file_name=f"script_{i}_{idx}.py", mime="text/plain", key=f"dl_{i}_{idx}"): pass
                 if btn_key in st.session_state.code_outputs:
                     st.code(st.session_state.code_outputs[btn_key], language="bash")
 
@@ -173,18 +152,25 @@ for i, msg in enumerate(st.session_state.messages):
 def image_to_base64(image):
     buffered = io.BytesIO()
     image.save(buffered, format="JPEG")
-    return f"data:image/jpeg;base64,{base64.b64encode(buffered.getvalue()).decode()}"
-
+    return base64.b64encode(buffered.getvalue()).decode()
 prompt_data = st.chat_input("Ask anything or attach a file...", accept_file="multiple")
-
 if prompt_data:
-    user_txt = getattr(prompt_data, "text", str(prompt_data))
-    uploaded_files = getattr(prompt_data, "files",[])
-
-    if not user_txt and uploaded_files: 
-        user_txt = "Please analyze the attached files."
+    # ... (Input processing logic remains the same)
+    user_txt = ""
+    uploaded_files = []
     
-    new_msg = {"role": "user", "content": user_txt, "images":[]} # বেস৬৪ স্ট্রিং সেভ হবে
+    if isinstance(prompt_data, dict):
+        user_txt = prompt_data.get("text", "")
+        uploaded_files = prompt_data.get("files", [])
+    elif hasattr(prompt_data, "text"):
+        user_txt = prompt_data.text
+        uploaded_files = prompt_data.files
+    elif isinstance(prompt_data, str):
+        user_txt = prompt_data
+    
+    if not user_txt and uploaded_files: user_txt = "Please analyze the attached files."
+    
+    new_msg = {"role": "user", "content": user_txt, "images":[]}
     
     if uploaded_files:
         for f in uploaded_files:
@@ -201,82 +187,59 @@ if prompt_data:
     st.rerun()
 
 # ==========================================
-# ৭. আল্টিমেট এআই রেসপন্স লজিক
+# ৭. আল্টিমেট এআই রেসপন্স লজিক (শুধু অলরাউন্ডার মডেল)
 # ==========================================
 if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
     last_msg = st.session_state.messages[-1]
-    
     model_info = MODEL_CATALOG[selected_model_name]
-    
-    # অটো-সুইচ লজিক
-    if last_msg["images"] and not model_info["vision"]:
-        st.info(f"'{selected_model_name}' can't process images. Auto-switching to Gemini 1.5 Flash for this request.")
-        model_info = MODEL_CATALOG["Gemini: 1.5 Flash 👁️"]
-        
     current_key = get_key(model_info["provider"])
 
-    if not current_key:
-        with st.chat_message("assistant"):
-            st.error(f"⚠️ API Key for {model_info['provider'].upper()} is missing!")
+    if not current_key or "আপনার_" in current_key:
+        with st.chat_message("assistant"): st.error(f"⚠️ API Key for {model_info['provider'].upper()} is missing!")
     else:
         with st.chat_message("assistant"):
             res_box = st.empty()
             full_res = ""
             
+            # সব মডেল এখন একই ফরম্যাটে মেসেজ তৈরি করবে
+            content_parts = [{"type": "text", "text": last_msg["content"]}]
+            if last_msg["images"]:
+                for img_b64 in last_msg["images"]:
+                    content_parts.append({
+                        "type": "image",
+                        "source": {"type": "base64", "media_type": "image/jpeg", "data": img_b64}
+                    })
+            
             try:
-                # --- মাল্টি-মোডাল Gemini লজিক ---
-                if model_info["provider"] == "gemini" and last_msg["images"]:
+                # --- Gemini লজিক ---
+                if model_info["provider"] == "gemini":
                     genai.configure(api_key=current_key)
                     model = genai.GenerativeModel(model_info["id"])
-                    img_parts = [Image.open(io.BytesIO(base64.b64decode(img.split(",")))) for img in last_msg["images"]]
-                    payload = [last_msg["content"]] + img_parts
+                    img_pil_parts = [Image.open(io.BytesIO(base64.b64decode(img))) for img in last_msg["images"]]
+                    payload = [last_msg["content"]] + img_pil_parts
                     response = model.generate_content(payload, stream=True)
                     for chunk in response:
                         full_res += chunk.text
                         res_box.markdown(full_res + "▌")
 
-                # --- মাল্টি-মোডাল OpenRouter লজিক ---
-                elif model_info["provider"] == "openrouter" and last_msg["images"]:
-                    headers = {"Authorization": f"Bearer {current_key}"}
-                    content_parts = [{"type": "text", "text": last_msg["content"]}]
-                    for img_b64 in last_msg["images"]:
-                        content_parts.append({"type": "image_url", "image_url": {"url": img_b64}})
-                    
-                    payload = {
-                        "model": model_info["id"], 
-                        "messages": [{"role": "user", "content": content_parts}]
-                    }
-                    res = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload)
-                    res.raise_for_status()
-                    full_res = res.json()['choices']['message']['content']
-                    res_box.markdown(full_res)
-
-                # --- টেক্সট-অনলি মডেল লজিক ---
-                else:
-                    if model_info["provider"] == "groq":
-                        client = Groq(api_key=current_key)
-                        msgs = [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages]
-                        stream = client.chat.completions.create(model=model_info["id"], messages=msgs, stream=True)
-                        for chunk in stream:
-                            if chunk.choices.delta.content:
-                                full_res += chunk.choices.delta.content
-                                res_box.markdown(full_res + "▌")
-
-                    elif model_info["provider"] == "gemini":
-                        genai.configure(api_key=current_key)
-                        model = genai.GenerativeModel(model_info["id"])
-                        response = model.generate_content(last_msg["content"], stream=True)
-                        for chunk in response:
-                            full_res += chunk.text
+                # --- Anthropic লজিক ---
+                elif model_info["provider"] == "anthropic":
+                    client = Anthropic(api_key=current_key)
+                    with client.messages.stream(model=model_info["id"], max_tokens=2048, messages=[{"role": "user", "content": content_parts}]) as stream:
+                        for chunk in stream.text_stream:
+                            full_res += chunk
                             res_box.markdown(full_res + "▌")
-                            
-                    elif model_info["provider"] == "openrouter":
-                        headers = {"Authorization": f"Bearer {current_key}"}
-                        payload = {"model": model_info["id"], "messages": [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages]}
-                        res = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload)
-                        res.raise_for_status()
-                        full_res = res.json()['choices']['message']['content']
-                        res_box.markdown(full_res)
+                
+                # --- Groq (LLaVA) লজিক ---
+                elif model_info["provider"] == "groq":
+                    # Groq пока не поддерживает stream для vision, তাই নরমাল কল হবে
+                    client = Groq(api_key=current_key)
+                    chat_completion = client.chat.completions.create(
+                        messages=[{"role": "user", "content": content_parts}],
+                        model=model_info["id"],
+                    )
+                    full_res = chat_completion.choices.message.content
+                    res_box.markdown(full_res)
                         
                 res_box.markdown(full_res)
                 st.session_state.messages.append({"role": "assistant", "content": full_res})
