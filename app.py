@@ -117,7 +117,7 @@ def get_key(prov):
     
     # 💡 আপনার এপিআই কীগুলো এখানে পেস্ট করুন 💡
     hardcoded_keys = {
-        "GROQ": "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",
+        "GROQ": "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",
         "GEMINI": "আপনার_GEMINI_কী",
         "ANTHROPIC": "আপনার_ANTHROPIC_কী"
     }
