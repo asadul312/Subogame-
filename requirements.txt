@@ -4,4 +4,5 @@ groq
 requests
 Pillow
 pandas
-beautifulsoup4
+anthropic
+mistralai
