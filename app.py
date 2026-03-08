@@ -226,7 +226,7 @@ if text or files:
                 client=Groq(api_key=get_api("GROQ"))
 
                 res=client.chat.completions.create(
-                model="llava-v1.5-7b-4096-preview",
+                model="llama-3.2-11b-vision-preview",
                 messages=[{"role":"user","content":text}]
                 )
 
