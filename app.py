@@ -44,7 +44,7 @@ st.markdown('<div class="title">NEXUS VISION AI</div>',unsafe_allow_html=True)
 # ---------- FIXED API KEYS ----------
 DEFAULT_KEYS = {
 "GEMINI":"PASTE_GEMINI_KEY",
-"GROQ":"PASTE_GROQ_KEY",
+"GROQ":"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",
 "ANTHROPIC":"PASTE_CLAUDE_KEY"
 }
 
@@ -75,8 +75,8 @@ if "messages" not in st.session_state:
 
 if "api" not in st.session_state:
     st.session_state.api={
-    "GEMINI":"gsk_xiCThKqe9Je639yc9uBnWGdyb3FYchYHtBUQW9EO9a3b93I6U",
-    "GROQ":"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",
+    "GEMINI":"",
+    "GROQ":"",
     "ANTHROPIC":""
     }
 
