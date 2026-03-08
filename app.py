@@ -221,24 +221,17 @@ if text or files:
                 response=res.content[0].text
 
             # GROQ
+            elif MODEL=="Groq Vision":
 
-from groq import Groq
+                client=Groq(api_key=get_api("GROQ"))
 
-client = Groq(
-    api_key=os.environ.get("GROQ_API_KEY"),
-)
+                res=client.chat.completions.create(
+                    model_name="llama-3.3-70b-versatile",
+                messages=[{"role":"user","content":text}]
+                )
 
-chat_completion = client.chat.completions.create(
-    messages=[
-        {
-            "role": "user",
-            "content": "Explain the importance of fast language models",
-        }
-    ],
-    model="llama-3.3-70b-versatile",
-)
+                response=res.choices[0].message.content
 
-print(chat_completion.choices[0].message.content)
             box.markdown(response)
 
         except Exception as e:
