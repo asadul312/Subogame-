@@ -43,7 +43,7 @@ st.markdown('<div class="title">NEXUS VISION AI</div>',unsafe_allow_html=True)
 
 # ---------- FIXED API KEYS ----------
 DEFAULT_KEYS = {
-"GEMINI":"PASTE_GEMINI_KEY",
+"GEMINI":"AIzaSyDrGCsi0rjp_PJ8RUWqJv521N1-vv4fyxo",
 "GROQ":"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",
 "ANTHROPIC":"PASTE_CLAUDE_KEY"
 }
