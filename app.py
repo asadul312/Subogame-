@@ -120,9 +120,9 @@ def get_key(prov):
     if user_key: return user_key
     
     hardcoded_keys = {
-        "GROQ": "", # আপনার Groq কী এখানে দিন
+        "GROQ": "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", # আপনার Groq কী এখানে দিন
         "GEMINI": "", # আপনার Gemini কী এখানে দিন
-        "OPENROUTER": "" # আপনার OpenRouter কী এখানে দিন
+        "OPENROUTER": "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" # আপনার OpenRouter কী এখানে দিন
     }
     return hardcoded_keys.get(prov.upper())
 
